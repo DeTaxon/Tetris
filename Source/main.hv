@@ -1,0 +1,7 @@
+
+
+main := !(char^[] args) -> int
+{
+	printf("Hello world\n")
+	return 0
+}

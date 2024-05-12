@@ -1,7 +1,27 @@
 
-
+TetrisWindow := class extend Window
+{
+	playField := PlayField
+	
+	InitWindow := virtual !() -> GUIObject^
+	{
+		playField.base = this&
+		playField.SetField(10,20)
+		return new LayoutHorizontal(![
+			new LayoutSpacer("",0),
+			new LayoutVertical(![
+				new LayoutSpacer("",0),
+				playField&,
+				new LayoutSpacer("",0),
+			]),
+			new LayoutSpacer("",0),
+		])
+	}
+}
 main := !(char^[] args) -> int
 {
-	printf("Hello world\n")
+	win := TetrisWindow(400,400,"Tetris")
+	win.ClearColor = vec4f(1.0,0.5,0.0,1.0)
+	win.Run()
 	return 0
 }

@@ -1,0 +1,93 @@
+PlayField := class extend GUIObject
+{
+	width := int
+	height := int
+
+	baseMesh := TVkMesh^
+
+	tilesPool := TDescriptorPool^
+	tileTexture := TVkTexture^
+	tileDesc := VkDescriptorSet
+
+	base := TetrisWindow^
+	baseIndCount := int
+
+	boxSize := int
+	margin := int
+
+	SetField := !(int w, int h) -> void
+	{
+		width = w
+		height = h
+
+		boxSize = 15
+		margin = 2
+
+		SetSize("static",boxSize*w + margin*(w - 1), "static", boxSize*h + margin*(h - 1))
+
+		vecData := Vector.{float}
+		vecData.Resize(5*4)
+
+		for itX,i : ![0.0,1.0,1.0,0.0] , itY : ![0.0,0.0,1.0,1.0]
+		{
+			vecData[i*5] = itX*boxSize
+			vecData[i*5 + 1] = itY*boxSize
+			colorData := vecData[i*5 + 4]&->{u8^}
+			colorData[0] = 255
+			colorData[1] = 255
+			colorData[2] = 255
+			colorData[3] = 255
+		}
+
+		indData := Vector.{s32}
+		indData.Resize(6)
+		indData[0] = 0
+		indData[1] = 1
+		indData[2] = 2
+		indData[3] = 0
+		indData[4] = 2
+		indData[5] = 3
+		baseIndCount = 6
+		
+		baseMesh = base.vInstance.CreateMesh(
+			ArraySpan.{u8}(vecData.GetPointer()->{u8^},4*vecData.Size()),
+			ArraySpan.{u8}(indData.GetPointer()->{u8^},indData.Size()*4),VKType(VType_UInt32,1)
+		)
+
+		tilesPool := base.vkOverlay.textDrawLayout.CreateDescriptorPool(0,20)
+
+		imgData := u8[4]
+		imgData[^] = 255
+
+		tileTexture = base.vInstance.CreateTexture()
+		tileTexture.CreateTexture(1,1,ArraySpan.{u8}(imgData[0]&,4))
+
+		tileDesc = tilesPool.CreateDescriptor()
+		vSetTexture(base.vInstance,tileDesc,tileTexture,base.vInstance.SamplerNearest)
+	}
+	PushDraw := virtual !(VkOverlayContext^ ctx,VkCommandBuffer cmdB,vec2f offset) -> void
+	{
+		ctx.textDrawShader.ApplyShaderToQueue(ctx.inst,cmdB,ctx.w,ctx.h)
+		sts := VkDescriptorSet[1]
+		sts[0] = tileDesc
+		ctx.inst.Funcs.vkCmdBindDescriptorSets(cmdB,VK_PIPELINE_BIND_POINT_GRAPHICS,ctx.textDrawLayout.Get(),0,1,sts[0]&,0,null)
+		baseMesh.Bind(cmdB)
+
+		for x : width
+		{
+			for y : height
+			{
+				scales := float[4]
+				scales[0] = 1.0 / ctx.w
+				scales[1] = 1.0 / ctx.h
+				scales[2] = offset.x + x*margin + x * boxSize
+				scales[3] = offset.y + y* margin + y* boxSize
+
+				ctx.inst.Funcs.vkCmdPushConstants(cmdB,ctx.textDrawLayout.Get(),VK_SHADER_STAGE_VERTEX_BIT,0,4*4,scales&)
+				ctx.inst.Funcs.vkCmdDrawIndexed(cmdB,baseIndCount,1,0,0,0)
+			}
+		}
+
+		return void
+	}
+}

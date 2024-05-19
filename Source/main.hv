@@ -1,4 +1,6 @@
 
+
+
 TetrisWindow := class extend Window
 {
 	playField := PlayField
@@ -7,6 +9,14 @@ TetrisWindow := class extend Window
 	{
 		playField.base = this&
 		playField.SetField(10,20)
+		//for i : 10
+		//{
+		//	for j : 20
+		//	{
+		//		playField.Spot(i,j) = RandInt(1..6) == 1
+		//	}
+		//}
+
 		return new LayoutHorizontal(![
 			new LayoutSpacer("",0),
 			new LayoutVertical(![
@@ -18,6 +28,7 @@ TetrisWindow := class extend Window
 		])
 	}
 }
+
 main := !(char^[] args) -> int
 {
 	win := TetrisWindow(400,400,"Tetris")

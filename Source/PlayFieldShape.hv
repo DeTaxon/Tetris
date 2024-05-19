@@ -1,0 +1,23 @@
+
+Figures := enum {
+	"None",
+	"LShape",
+	"LShapeAnti",
+	"Line",
+	"Cube",
+	"Chair",
+	"Tank"
+}
+
+AppendClass PlayField
+{
+	CurrentShape := Figures
+	CurrentShapePos := Tuple.{int,int}
+	CurrentShapeRotation := int
+
+	DrawShape := !(VkOverlayContext^ ctx,VkCommandBuffer cmdB,vec2f offset) -> void
+	{
+
+
+	}
+}

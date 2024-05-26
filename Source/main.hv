@@ -9,13 +9,13 @@ TetrisWindow := class extend Window
 	{
 		playField.base = this&
 		playField.SetField(10,20)
-		//for i : 10
-		//{
-		//	for j : 20
-		//	{
-		//		playField.Spot(i,j) = RandInt(1..6) == 1
-		//	}
-		//}
+
+		playField.CurrentShape&->{int^}^ = RandInt(1..8)
+		playField.CurrentShapePos.0 = 4 
+
+		TSpawnTask(() ==> {
+			Phys()
+		})
 
 		return new LayoutHorizontal(![
 			new LayoutSpacer("",0),
@@ -27,12 +27,29 @@ TetrisWindow := class extend Window
 			new LayoutSpacer("",0),
 		])
 	}
+
+	KeyChangedChar := virtual !(int key, bool pressed) -> void
+	{
+		if playField.KeyChangedChar(key,pressed)
+			RedrawWindow()
+	}
+	Phys := !() -> void
+	{
+		while true
+		{
+			playField.PhysTick()
+			RedrawWindow()
+			TSleep(0.6)
+		}
+	}
 }
 
 main := !(char^[] args) -> int
 {
+	InitTable()
 	win := TetrisWindow(400,400,"Tetris")
 	win.ClearColor = vec4f(1.0,0.5,0.0,1.0)
+
 	win.Run()
 	return 0
 }

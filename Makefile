@@ -10,5 +10,5 @@ tetris:
 run_nonstop:
 	./halfvoid -run main -nonstop -g -C0 StandardHVLibrary -C1 Source --vk vk.xml -cache /tmp/TetrisCache.zip 
 run_nonstop.exe:
-	$(gdb_tui) ./halfvoid.exe -run main -nonstop -g -C0 StandardHVLibrary -C1 Source --vk vk.xml 
+	$(gdb_tui) ./halfvoid.exe -run main -nonstop -g -C0 StandardHVLibrary -C1 Source -cache /tmp/TetrisCache.zip --vk vk.xml 
 .PHONY: tetris run_nonstop run_nonstop.exe

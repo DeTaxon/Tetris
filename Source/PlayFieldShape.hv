@@ -6,9 +6,86 @@ Figures := enum {
 	"Line",
 	"Cube",
 	"Chair",
+	"ChairAnti",
 	"Tank"
 }
 
+LShapeData := ![
+	0,1,0,
+	0,1,0,
+	0,1,1,
+
+	0,0,0,
+	1,1,1,
+	1,0,0,
+
+	1,1,0,
+	0,1,0,
+	0,1,0,
+
+	0,0,1,
+	1,1,1,
+	0,0,0,
+]
+
+ChairShapeData := ![
+	0,1,0,
+	0,1,1,
+	0,0,1,
+
+	0,0,0,
+	0,1,1,
+	1,1,0,
+
+	0,1,0,
+	0,1,1,
+	0,0,1,
+
+	0,0,0,
+	0,1,1,
+	1,1,0,
+]
+TankShapeData := ![
+	0,1,0,
+	0,1,1,
+	0,1,0,
+
+	0,0,0,
+	1,1,1,
+	0,1,0,
+
+	0,1,0,
+	1,1,0,
+	0,1,0,
+
+	0,1,0,
+	1,1,1,
+	0,0,0,
+]
+
+ViggleCheck := ![
+	25,24,23,22,21,
+	20, 9, 7, 8,19,
+	11, 3, 1, 2,10,
+	13, 6, 4, 5,12,
+	18,17,16,15,14,
+]
+ViggleCheckX := int[25]
+ViggleCheckY := int[25]
+
+InitTable := !() -> void
+{
+	for x : 5
+	{
+		for y : 5
+		{
+			ind := y*5 + x
+			c := ViggleCheck[ind] - 1
+			ViggleCheckX[c] = x - 2
+			ViggleCheckY[c] = y - 2
+		}
+	}
+}
 AppendClass PlayField
 {
 	CurrentShape := Figures
@@ -17,7 +94,179 @@ AppendClass PlayField
 
 	DrawShape := !(VkOverlayContext^ ctx,VkCommandBuffer cmdB,vec2f offset) -> void
 	{
-
+		PerBoxCheck(CurrentShapePos,CurrentShapeRotation,(x,y) ==> {
+			DrawTile(ctx,cmdB,vec4f(1.0,1.0,1.0,1.0),offset,x,y)
+		})
+	}
+	PerBoxCheck := !(Tuple.{int,int} shapePos,int shapeRotation,!(int,int)&->void cb) -> void
+	{
+		switch CurrentShape
+		{
+		case "LShape"
+			Draw9x9(shapePos,shapeRotation,LShapeData,false,cb)
+		case "LShapeAnti"
+			Draw9x9(shapePos,shapeRotation,LShapeData,true,cb)
+		case "Line"
+			for dx : (-1)..2 {
+				for dy : (-1)..2 {
+					if shapeRotation mod 2 == 0
+					{
+						if dx == 0 {
+							cb(shapePos.0 + dx,shapePos.1 + dy)
+						}
+					}else{
+						if dy == 0 {
+							cb(shapePos.0 + dx,shapePos.1 + dy)
+						}
+					}
+				}
+			}
+		case "Cube"
+			for dx : 2 {
+				for dy : 2 {
+					cb(shapePos.0 + dx,shapePos.1 + dy)
+				}
+			}
+		case "Chair"
+			Draw9x9(shapePos,shapeRotation,ChairShapeData,false,cb)
+		case "ChairAnti"
+			Draw9x9(shapePos,shapeRotation,ChairShapeData,true,cb)
+		case "Tank"
+			Draw9x9(shapePos,shapeRotation,TankShapeData,false,cb)
+		}
+	}
+	Draw9x9 := !(Tuple.{int,int} shapePos, int shapeRotation,int^ ptr,bool antiVal, !(int,int)& -> void cb) -> void
+	{
+		rot := shapeRotation mod 4
+		if antiVal
+			rot = 3 - rot
+		dat := ptr[9*rot]&
+		for dx : 3 {
+			for dy : 3 {
+				xVal := dx
+				if antiVal
+					xVal = 2 - xVal
+				if dat[xVal + dy*3] != 0 {
+					cb(shapePos.0 + dx, shapePos.1 + dy)
+				}
+			}
+		}
 
 	}
+
+
+	CheckCollision := !(int dx, int dy,int addRotation = 0) -> bool
+	{
+		shapePos := CurrentShapePos
+		shapePos.0 += dx
+		shapePos.1 += dy
+
+		metSomeone := false
+		metWall := false
+
+		shapeRotation := CurrentShapeRotation + addRotation
+		shapeRotation = shapeRotation mod 4
+
+		PerBoxCheck(shapePos,shapeRotation,(x,y) ==> {
+			if x >= width or x < 0
+			{
+				metWall = true
+				return void
+			}
+			if y >= height or y< 0
+			{
+				metWall = true
+				return void
+			}
+			if Spot(x,y)
+			{
+				metSomeone = true
+			}
+		})
+		return metSomeone or metWall
+	}
+	PhysTick := !() -> void
+	{
+		if CheckCollision(0,1)
+		{
+			ApplyFigure()
+		}else{
+			CurrentShapePos.1 += 1
+		}
+	}
+	KeyChangedChar := !(int key, bool pressed) -> bool
+	{
+		if not pressed
+			return void
+		switch key
+		{
+		case 'a'
+			if not CheckCollision(-1,0)
+				CurrentShapePos.0 -= 1
+			return true
+		case 'd'
+			if not CheckCollision( 1,0)
+				CurrentShapePos.0 += 1
+			return true
+		case 'w'
+			y := 0
+			while not CheckCollision(0,y)
+				y += 1
+			CurrentShapePos.1 += y - 1
+			ApplyFigure()
+			return true
+		case ' '
+
+			for i : 25
+			{
+				dx := ViggleCheckX[i]
+				dy := ViggleCheckY[i]
+				if not CheckCollision(dx,dy,1)
+				{
+					CurrentShapePos.0 += dx
+					CurrentShapePos.1 += dy
+					CurrentShapeRotation += 1
+					return true
+				}
+			}
+			return true
+		}
+		return false
+	}
+	ApplyFigure := !() -> void
+	{
+		PerBoxCheck(CurrentShapePos,CurrentShapeRotation, (x,y) ==> {
+			Spot(x,y) = true
+		})
+		CurrentShapePos.1 = 0
+		CurrentShapePos.0 = 5
+		CurrentShape&->{int^}^ = RandInt(1..8)
+
+		for y : height
+		{
+			allOnes := true
+			for x : width
+			{
+				if not Spot(x,y)
+					allOnes = false
+			}
+			if allOnes
+			{
+				y2 := y
+				while y2 > 0
+				{
+					for x : width
+					{
+						Spot(x,y2) = Spot(x,y2 - 1)
+					}
+					y2 -= 1
+				}
+				for x : width
+				{
+					Spot(x,0) = false
+				}
+			}
+		}
+	}
+
 }

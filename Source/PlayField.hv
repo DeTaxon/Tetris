@@ -75,24 +75,29 @@ PlayField := class extend GUIObject
 		vSetTexture(base.vInstance,tileDesc,tileTexture,base.vInstance.SamplerNearest)
 	}
 
-	DrawTile := !(VkOverlayContext^ ctx,VkCommandBuffer cmdB,vec2f offset,int x, int y) -> void
+	DrawTile := !(VkOverlayContext^ ctx,VkCommandBuffer cmdB,vec4f color,vec2f offset,int x, int y) -> void
 	{
 		newOffset := vec2f
 
 		newOffset.x = offset.x + x*margin + x * boxSize
 		newOffset.y = offset.y + y* margin + y* boxSize
 
-		DrawTile(ctx,cmdB,newOffset)
+		DrawTile(ctx,cmdB,color,newOffset)
 	}
-	DrawTile := !(VkOverlayContext^ ctx,VkCommandBuffer cmdB,vec2f offset) -> void
+	DrawTile := !(VkOverlayContext^ ctx,VkCommandBuffer cmdB, vec4f color,vec2f offset) -> void
 	{
-		scales := float[4]
+		scales := float[8]
 		scales[0] = 1.0 / ctx.w
 		scales[1] = 1.0 / ctx.h
 		scales[2] = offset.x
 		scales[3] = offset.y
 
-		ctx.inst.Funcs.vkCmdPushConstants(cmdB,ctx.textDrawLayout.Get(),VK_SHADER_STAGE_VERTEX_BIT,0,4*4,scales&)
+		scales[4] = color.x
+		scales[5] = color.y
+		scales[6] = color.z
+		scales[7] = color.w
+
+		ctx.inst.Funcs.vkCmdPushConstants(cmdB,ctx.textDrawLayout.Get(),VK_SHADER_STAGE_VERTEX_BIT,0,32,scales&)
 		ctx.inst.Funcs.vkCmdDrawIndexed(cmdB,baseIndCount,1,0,0,0)
 	}
 	PushDraw := virtual !(VkOverlayContext^ ctx,VkCommandBuffer cmdB,vec2f offset) -> void
@@ -107,21 +112,15 @@ PlayField := class extend GUIObject
 		{
 			for y : height
 			{
-				//if not Spot(x,y)
-				//	continue
+				DrawTile(ctx,cmdB,vec4f(0.5,0.5,0.5,1.0),offset,x,y)
 
-				//DrawTile(ctx,cmdB,offset,x,y)
+				if not Spot(x,y)
+					continue
 
-				scales := float[4]
-				scales[0] = 1.0 / ctx.w
-				scales[1] = 1.0 / ctx.h
-				scales[2] = offset.x + x*margin + x * boxSize
-				scales[3] = offset.y + y* margin + y* boxSize
-
-				ctx.inst.Funcs.vkCmdPushConstants(cmdB,ctx.textDrawLayout.Get(),VK_SHADER_STAGE_VERTEX_BIT,0,4*4,scales&)
-				ctx.inst.Funcs.vkCmdDrawIndexed(cmdB,baseIndCount,1,0,0,0)
+				DrawTile(ctx,cmdB,vec4f(1.0,1.0,1.0,1.0),offset,x,y)
 			}
 		}
+		DrawShape(ctx,cmdB,offset)
 
 		return void
 	}

@@ -70,6 +70,7 @@ ViggleCheck := ![
 	13, 6, 4, 5,12,
 	18,17,16,15,14,
 ]
+
 ViggleCheckX := int[25]
 ViggleCheckY := int[25]
 
@@ -86,6 +87,7 @@ InitTable := !() -> void
 		}
 	}
 }
+
 AppendClass PlayField
 {
 	CurrentShape := Figures

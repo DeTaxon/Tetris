@@ -4,6 +4,8 @@
 TetrisWindow := class extend Window
 {
 	playField := PlayField
+
+	secretImage := TVkTexture^ 
 	
 	InitWindow := virtual !() -> GUIObject^
 	{
@@ -12,6 +14,14 @@ TetrisWindow := class extend Window
 
 		playField.CurrentShape&->{int^}^ = RandInt(1..8)
 		playField.CurrentShapePos.0 = 4 
+
+		mnstr := FSGetFile("Monster1.webp")
+		mImg := new ImageFile(mnstr)
+		mImg2 := mImg.CreateImage("RGBA")
+
+		secretImage = vInstance.CreateTexture()
+		secretImage.CreateTexture(512,512,ArraySpan.{u8}(mImg2.GetPointer(),512*512*4))
+
 
 		TSpawnTask(() ==> {
 			Phys()
@@ -49,7 +59,6 @@ main := !(char^[] args) -> int
 	InitTable()
 	win := TetrisWindow(400,400,"Tetris")
 	win.ClearColor = vec4f(1.0,0.5,0.0,1.0)
-
 	win.Run()
 	return 0
 }

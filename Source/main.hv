@@ -9,22 +9,41 @@ TetrisWindow := class extend Window
 	
 	InitWindow := virtual !() -> GUIObject^
 	{
-		playField.base = this&
-		playField.SetField(10,20)
-
-		playField.CurrentShape&->{int^}^ = RandInt(1..8)
-		playField.CurrentShapePos.0 = 4 
-
-		mnstr := FSGetFile("Monster1.webp")
+		mnstr := #File("Monster1.webp")
 		mImg := new ImageFile(mnstr)
 		mImg2 := mImg.CreateImage("RGBA")
 
 		secretImage = vInstance.CreateTexture()
 		secretImage.CreateTexture(512,512,ArraySpan.{u8}(mImg2.GetPointer(),512*512*4))
 
+		playField.secretTexture = secretImage
+
+		playField.base = this&
+		playField.SetField(10,25)
+
+		playField.CurrentShape&->{int^}^ = RandInt(1..8)
+		playField.CurrentShapePos.0 = 4 
 
 		TSpawnTask(() ==> {
 			Phys()
+		})
+		TSpawnTask(() ==> {
+			prevTime := GetSteadyTime()
+			while true
+			{
+				nowTime := GetSteadyTime()
+				playField.Step(nowTime - prevTime)
+				prevTime = nowTime
+				RedrawWindow()
+				TSleep(1 / 60)
+			}
+		})
+		TSpawnTask(() ==> {
+			while true
+			{
+				TSleep(4)
+				playField.StartMonster()
+			}
 		})
 
 		return new LayoutHorizontal(![
@@ -49,7 +68,10 @@ TetrisWindow := class extend Window
 		{
 			playField.PhysTick()
 			RedrawWindow()
-			TSleep(0.6)
+			playField.GliderStep()
+			TSleep(0.3)
+			playField.GliderStep()
+			TSleep(0.3)
 		}
 	}
 }
@@ -57,7 +79,7 @@ TetrisWindow := class extend Window
 main := !(char^[] args) -> int
 {
 	InitTable()
-	win := TetrisWindow(400,400,"Tetris")
+	win := TetrisWindow(400,470,"Tetris")
 	win.ClearColor = vec4f(1.0,0.5,0.0,1.0)
 	win.Run()
 	return 0

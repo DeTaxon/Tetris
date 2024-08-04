@@ -18,6 +18,20 @@ PlayField := class extend GUIObject
 
 	FieldState := bool[1024]
 
+	IsInRange := !(int x, int y) -> bool
+	{
+		if x < 0 or y < 0
+			return false
+		if x >= width or y >= height
+			return false
+		return true
+	}
+	IsSpot := !(int x, int y) -> bool
+	{
+		if not IsInRange(x,y)
+			return false
+		return Spot(x,y)
+	}
 	Spot := !(int x, int y) -> ref bool
 	{
 		indx := x + y*width
@@ -41,6 +55,8 @@ PlayField := class extend GUIObject
 		{
 			vecData[i*5] = itX*boxSize
 			vecData[i*5 + 1] = itY*boxSize
+			vecData[i*5 + 2] = itX
+			vecData[i*5 + 3] = itY
 			colorData := vecData[i*5 + 4]&->{u8^}
 			colorData[0] = 255
 			colorData[1] = 255
@@ -73,6 +89,9 @@ PlayField := class extend GUIObject
 
 		tileDesc = tilesPool.CreateDescriptor()
 		vSetTexture(base.vInstance,tileDesc,tileTexture,base.vInstance.SamplerNearest)
+
+		secretDescr = tilesPool.CreateDescriptor()
+		vSetTexture(base.vInstance,secretDescr,secretTexture,base.vInstance.SamplerNearest)
 	}
 
 	DrawTile := !(VkOverlayContext^ ctx,VkCommandBuffer cmdB,vec4f color,vec2f offset,int x, int y) -> void
@@ -86,18 +105,23 @@ PlayField := class extend GUIObject
 	}
 	DrawTile := !(VkOverlayContext^ ctx,VkCommandBuffer cmdB, vec4f color,vec2f offset) -> void
 	{
-		scales := float[8]
+		scales := float[12]
 		scales[0] = 1.0 / ctx.w
 		scales[1] = 1.0 / ctx.h
 		scales[2] = offset.x
 		scales[3] = offset.y
 
-		scales[4] = color.x
-		scales[5] = color.y
-		scales[6] = color.z
-		scales[7] = color.w
+		scales[4] = 1.0
+		scales[5] = 1.0
+		scales[6] = 0 
+		scales[7] = 0 
 
-		ctx.inst.Funcs.vkCmdPushConstants(cmdB,ctx.textDrawLayout.Get(),VK_SHADER_STAGE_VERTEX_BIT,0,32,scales&)
+		scales[8] = color.x
+		scales[9] = color.y
+		scales[10] = color.z
+		scales[11] = color.w
+
+		ctx.inst.Funcs.vkCmdPushConstants(cmdB,ctx.textDrawLayout.Get(),VK_SHADER_STAGE_VERTEX_BIT,0,48,scales&)
 		ctx.inst.Funcs.vkCmdDrawIndexed(cmdB,baseIndCount,1,0,0,0)
 	}
 	PushDraw := virtual !(VkOverlayContext^ ctx,VkCommandBuffer cmdB,vec2f offset) -> void
@@ -122,6 +146,162 @@ PlayField := class extend GUIObject
 		}
 		DrawShape(ctx,cmdB,offset)
 
+		if gliderExist
+		{
+			for i : 9
+			{
+				pos := GetGliderPos(i)
+				DrawTile(ctx,cmdB,vec4f(1.0,1.0,1.0,1.0),offset,pos?.x,pos?.y)
+			}
+		}
+
+		if mnstrInUse
+		{
+			color := vec4f(1.0,1.0,1.0,1.0)
+			sts[0] = secretDescr
+			ctx.inst.Funcs.vkCmdBindDescriptorSets(cmdB,VK_PIPELINE_BIND_POINT_GRAPHICS,ctx.textDrawLayout.Get(),0,1,sts[0]&,0,null)
+			scales := float[8]
+			scales[0] = 1.0 / ctx.w
+			scales[1] = 1.0 / ctx.h
+			scales[2] = mnstrInverse ?: 400-mnstrPos.x : mnstrPos.x
+			scales[3] = mnstrPos.y
+
+			scales[4] = mnstrInverse ?: 10.0 : -10.0
+			scales[5] = 10.0
+			scales[6] = 0
+			scales[7] = 0
+
+			scales[8] = color.x
+			scales[9] = color.y
+			scales[10] = color.z
+			scales[11] = color.w
+
+			ctx.inst.Funcs.vkCmdPushConstants(cmdB,ctx.textDrawLayout.Get(),VK_SHADER_STAGE_VERTEX_BIT,0,48,scales&)
+			ctx.inst.Funcs.vkCmdDrawIndexed(cmdB,baseIndCount,1,0,0,0)
+		}
 		return void
 	}
+
+	mnstrInUse := bool
+	mnstrTime := double
+	mnstrPos := vec2f
+	mnstrInverse := bool
+	mnstrMove := double
+
+	Step := !(double delta) -> void
+	{
+		mnstrMove = 120
+		if mnstrInUse
+		{
+			times := ![0.2,1.0,0.2]
+			addedTimes := ![0.0,0.0,0.0]
+
+			acc := 0.0
+			for d : times , ad : addedTimes
+			{
+				acc += d
+				ad = acc
+			}
+			
+			if mnstrTime < addedTimes[0]
+			{
+				proc := mnstrTime / times[0]
+				mnstrPos = vec2f(mnstrMove,0.0)*(proc)
+			}else if mnstrTime < addedTimes[1] {
+				SpawnGlider()
+			}else if mnstrTime < addedTimes[2] {
+				proc := (mnstrTime - addedTimes[1]) / times[2]
+				proc = 1.0 - proc
+				mnstrPos = vec2f(mnstrMove,0.0)*proc
+			} else{
+				mnstrInUse = false
+				mnstrInverse = not mnstrInverse
+			}
+			mnstrTime += delta
+		}
+	}
+	StartMonster := !() -> void
+	{
+		if gliderExist
+			return void
+		mnstrInUse = true
+		mnstrTime = 0
+	}
+
+	gliderExist := bool
+	gliderPosition := vec2i
+	gliderAnimation := int
+	gliderInverse := bool
+
+	SpawnGlider := !() -> void
+	{
+		if gliderExist
+			return void
+
+		gliderExist = true
+		gliderInverse = mnstrInverse
+		gliderAnimation = 0
+		if mnstrInverse
+		{
+			gliderPosition = vec2i(12,2)
+		}else{
+			gliderPosition = vec2i(-5,2)
+		}
+	}
+	GliderStep := !() -> void
+	{
+		if not gliderExist
+			return void
+
+		if gliderInverse
+		{
+			gliderPosition.x -= ShiftX[gliderAnimation] 
+		}else{
+			gliderPosition.x += ShiftX[gliderAnimation] 
+		}
+		gliderPosition.y += ShiftY[gliderAnimation]
+		gliderAnimation = (gliderAnimation + 1) mod 4
+
+		if gliderInverse and gliderPosition.x < 0
+		{
+			gliderExist = false
+		}else if not gliderInverse and gliderPosition.x >7 {
+			gliderExist = false
+		}else{
+			for i : 9
+			{
+				pos := GetGliderPos(i)
+				if IsSpot(pos?.x,pos?.y)
+					gliderExist = false
+			}
+		}
+		if not gliderExist
+		{
+			for i : 9
+			{
+				pos := GetGliderPos(i)
+				if not pos.IsSet()
+					continue
+				if IsInRange(pos.x,pos.y)
+				{
+					Spot(pos.x,pos.y) = true
+				}
+			}
+		}
+	}
+	GetGliderPos := !(int indx) -> vec2i?
+	{
+		x := indx mod 3
+		y := indx div 3
+		stripe := y*3 + gliderAnimation*9
+		checkX := x
+		if gliderInverse
+			checkX = 2 - x
+		if Glider[stripe + checkX] != 1
+			return void
+		result = vec2i(gliderPosition.x + x,gliderPosition.y + y)
+	}
+
+	secretTexture := TVkTexture^ 
+	secretDescr := VkDescriptorSet
 }

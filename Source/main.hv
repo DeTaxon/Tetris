@@ -6,9 +6,18 @@ TetrisWindow := class extend Window
 	playField := PlayField
 
 	secretImage := TVkTexture^ 
+	soundEngine := SoundEngine^
+
+	backgroundMusic := Sound^
 	
 	InitWindow := virtual !() -> GUIObject^
 	{
+		soundEngine = new SoundEngine()
+		backgroundMusic = soundEngine.CreateSound(FSGetFile("Tetris.wav"))
+		soundEngine.PlaySoundLooped(backgroundMusic)
+		playField.sEng = soundEngine
+		playField.ToastySound = soundEngine.CreateSound(FSGetFile("Toasty.wav"))
+
 		mnstr := #File("Monster1.webp")
 		mImg := new ImageFile(mnstr)
 		mImg2 := mImg.CreateImage("RGBA")

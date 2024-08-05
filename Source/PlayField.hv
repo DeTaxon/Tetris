@@ -18,6 +18,9 @@ PlayField := class extend GUIObject
 
 	FieldState := bool[1024]
 
+	sEng := SoundEngine^
+	ToastySound := Sound^
+
 	IsInRange := !(int x, int y) -> bool
 	{
 		if x < 0 or y < 0
@@ -224,6 +227,7 @@ PlayField := class extend GUIObject
 	{
 		if gliderExist
 			return void
+		sEng.PlaySound(ToastySound)
 		mnstrInUse = true
 		mnstrTime = 0
 	}

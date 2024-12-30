@@ -94,6 +94,12 @@ AppendClass PlayField
 	CurrentShapePos := Tuple.{int,int}
 	CurrentShapeRotation := int
 
+	DrawGLShape := !(WindowGLContext^ ctx,vec2f offset) -> void
+	{
+		//PerBoxCheck(CurrentShapePos,CurrentShapeRotation,(x,y) ==> {
+		//	DrawGLTile(ctx,vec4f(1.0,1.0,1.0,1.0),offset,x,y)
+		//})
+	}
 	DrawShape := !(VkOverlayContext^ ctx,VkCommandBuffer cmdB,vec2f offset) -> void
 	{
 		PerBoxCheck(CurrentShapePos,CurrentShapeRotation,(x,y) ==> {

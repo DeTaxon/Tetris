@@ -4,11 +4,11 @@ PlayField := class extend GUIObject
 	width := int
 	height := int
 
-	baseMesh := TVkMesh^
+	//baseMesh := TVkMesh^
 
-	tilesPool := TDescriptorPool^
-	tileTexture := TVkTexture^
-	tileDesc := VkDescriptorSet
+	//tilesPool := TDescriptorPool^
+	//tileTexture := TVkTexture^
+	//tileDesc := VkDescriptorSet
 
 	base := TetrisWindow^
 	baseIndCount := int
@@ -76,114 +76,155 @@ PlayField := class extend GUIObject
 		indData[4] = 2
 		indData[5] = 3
 		baseIndCount = 6
+	}
+
+	shaderId := u32
+	locConsts := s32
+	locSet := s32
+	modelId := int
+
+	InitGL := virtual !(WindowGLContext^ ctx) -> bool
+	{
+		ptr := char^
+		len := int
+		shaderId = ctx.gl.CreateProgram()
+
+		vert := ctx.gl.CreateShader(GL_VERTEX_SHADER)
+		fFile := #File("local:PlayFieldGLVertex.vert").GetBlob()
+		ptr = fFile.GetPointer()->{char^}
+		len = fFile.Size()
+		ctx.gl.ShaderSource(vert,1,ptr&,len&)
+		ctx.gl.CompileShader(vert)
+
+		ctx.gl.GetShaderiv(vert,GL_INFO_LOG_LENGTH,len&)
+
+		if len > 1
+		{
+			blb := MakeBlob(len)
+			ctx.gl.GetShaderInfoLog(vert,len,null,blb.GetPointer()->{char^})
+			printf("failed to compile vertex shader %s\n",blb.GetPointer())
+			return false
+		}
+
+		frag := ctx.gl.CreateShader(GL_FRAGMENT_SHADER)
+		vFile := #File("local:PlayFieldGLFragment.frag").GetBlob()
+		ptr = vFile.GetPointer()->{char^}
+		len = vFile.Size()
+		ctx.gl.ShaderSource(frag,1,ptr&,len&)
+		ctx.gl.CompileShader(frag)
+
+		ctx.gl.GetShaderiv(frag,GL_INFO_LOG_LENGTH,len&)
+
+		if len > 1
+		{
+			blb := MakeBlob(len)
+			ctx.gl.GetShaderInfoLog(frag,len,null,blb.GetPointer()->{char^})
+			printf("failed to compile fragment shader %s\n",blb.GetPointer())
+			return false
+		}
+
+		ctx.gl.AttachShader(shaderId,frag)
+		ctx.gl.AttachShader(shaderId,vert)
+		ctx.gl.LinkProgram(shaderId)
+
+		status := int
+		ctx.gl.GetProgramiv(shaderId, GL_LINK_STATUS, status&)
+
+		locConsts = 0 //ctx.gl.GetUniformLocation(shaderId,"Consts")
+		locSet = 0 //ctx.gl.GetAttribLocation(shaderId,"isSet")
+
+
+		//ctx.gl.CreateVertexArrays(1,vao&)
+		//ctx.gl.CreateBuffers(1,vbo&)
+
+
+		//ctx.gl.EnableVertexArrayAttrib(vao,locSet)
+		//ctx.gl.VertexArrayAttribFormat(vao,locSet,1,GL_UNSIGNED_BYTE,GL_TRUE,0)
 		
-		baseMesh = base.vInstance.CreateMesh(
-			ArraySpan.{u8}(vecData.GetPointer()->{u8^},4*vecData.Size()),
-			ArraySpan.{u8}(indData.GetPointer()->{u8^},indData.Size()*4),VKType(VType_UInt32,1)
-		)
 
-		tilesPool := base.vkOverlay.textDrawLayout.CreateDescriptorPool(0,20)
+		ctx.gl.GenVertexArrays(1,vao&)
+		ctx.gl.GenBuffers(1,vbo&)
 
-		imgData := u8[4]
-		imgData[^] = 255
+		ctx.gl.BindBuffer(GL_ARRAY_BUFFER,vbo)
+		ctx.gl.BufferData(GL_ARRAY_BUFFER,width*height,FieldState[0]&,GL_DYNAMIC_DRAW)
 
-		tileTexture = base.vInstance.CreateTexture()
-		tileTexture.CreateTexture(1,1,ArraySpan.{u8}(imgData[0]&,4))
+		ctx.gl.BindVertexArray(vao)
+		ctx.gl.EnableVertexAttribArray(locSet)
+		ctx.gl.VertexAttribPointer(locSet,1,GL_UNSIGNED_BYTE,GL_FALSE,1,null)
+		ctx.gl.BindVertexArray(0)
 
-		tileDesc = tilesPool.CreateDescriptor()
-		vSetTexture(base.vInstance,tileDesc,tileTexture,base.vInstance.SamplerNearest)
+		ctx.gl.GenBuffers(1,vboIndex&)
+		ctx.gl.BindBuffer(GL_ELEMENT_ARRAY_BUFFER,vboIndex)
 
-		secretDescr = tilesPool.CreateDescriptor()
-		vSetTexture(base.vInstance,secretDescr,secretTexture,base.vInstance.SamplerNearest)
-	}
+		inds := Vector.{int}
+		inds.Resize(1024*6)
+		ptr := inds.GetPointer()
 
-	DrawTile := !(VkOverlayContext^ ctx,VkCommandBuffer cmdB,vec4f color,vec2f offset,int x, int y) -> void
-	{
-		newOffset := vec2f
-
-		newOffset.x = offset.x + x*margin + x * boxSize
-		newOffset.y = offset.y + y* margin + y* boxSize
-
-		DrawTile(ctx,cmdB,color,newOffset)
-	}
-	DrawTile := !(VkOverlayContext^ ctx,VkCommandBuffer cmdB, vec4f color,vec2f offset) -> void
-	{
-		scales := float[12]
-		scales[0] = 1.0 / ctx.w
-		scales[1] = 1.0 / ctx.h
-		scales[2] = offset.x
-		scales[3] = offset.y
-
-		scales[4] = 1.0
-		scales[5] = 1.0
-		scales[6] = 0 
-		scales[7] = 0 
-
-		scales[8] = color.x
-		scales[9] = color.y
-		scales[10] = color.z
-		scales[11] = color.w
-
-		ctx.inst.Funcs.vkCmdPushConstants(cmdB,ctx.textDrawLayout.Get(),VK_SHADER_STAGE_VERTEX_BIT,0,48,scales&)
-		ctx.inst.Funcs.vkCmdDrawIndexed(cmdB,baseIndCount,1,0,0,0)
-	}
-	PushDraw := virtual !(VkOverlayContext^ ctx,VkCommandBuffer cmdB,vec2f offset) -> void
-	{
-		ctx.textDrawShader.ApplyShaderToQueue(ctx.inst,cmdB,ctx.w,ctx.h)
-		sts := VkDescriptorSet[1]
-		sts[0] = tileDesc
-		ctx.inst.Funcs.vkCmdBindDescriptorSets(cmdB,VK_PIPELINE_BIND_POINT_GRAPHICS,ctx.textDrawLayout.Get(),0,1,sts[0]&,0,null)
-		baseMesh.Bind(cmdB)
-
-		for x : width
+		for it : 1024
 		{
-			for y : height
+			for i : 6
 			{
-				DrawTile(ctx,cmdB,vec4f(0.5,0.5,0.5,1.0),offset,x,y)
-
-				if not Spot(x,y)
-					continue
-
-				DrawTile(ctx,cmdB,vec4f(1.0,1.0,1.0,1.0),offset,x,y)
+				ptr[it*6 + i] = it
 			}
 		}
-		DrawShape(ctx,cmdB,offset)
+		ctx.gl.BufferData(GL_ELEMENT_ARRAY_BUFFER,4*inds.Size(),ptr,GL_STATIC_DRAW)
 
-		if gliderExist
-		{
-			for i : 9
-			{
-				pos := GetGliderPos(i)
-				DrawTile(ctx,cmdB,vec4f(1.0,1.0,1.0,1.0),offset,pos?.x,pos?.y)
-			}
-		}
 
-		if mnstrInUse
-		{
-			color := vec4f(1.0,1.0,1.0,1.0)
-			sts[0] = secretDescr
-			ctx.inst.Funcs.vkCmdBindDescriptorSets(cmdB,VK_PIPELINE_BIND_POINT_GRAPHICS,ctx.textDrawLayout.Get(),0,1,sts[0]&,0,null)
-			scales := float[8]
-			scales[0] = 1.0 / ctx.w
-			scales[1] = 1.0 / ctx.h
-			scales[2] = mnstrInverse ?: 400-mnstrPos.x : mnstrPos.x
-			scales[3] = mnstrPos.y
+		cnsts := GlobInfo
+		cnsts.offset = vec2f(0,0)
+		cnsts.boxSize = vec2f(boxSize,boxSize)
+		cnsts.boxMargin = vec2f(margin,margin)
+		cnsts.counts = vec2i(width,height)
 
-			scales[4] = mnstrInverse ?: 10.0 : -10.0
-			scales[5] = 10.0
-			scales[6] = 0
-			scales[7] = 0
+		ctx.gl.GenBuffers(1,constsObj&)
+		ctx.gl.BindBuffer(GL_UNIFORM_BUFFER,constsObj)
+		ctx.gl.BufferData(GL_UNIFORM_BUFFER,GlobInfo->TypeSize,cnsts&,GL_STATIC_DRAW)
 
-			scales[8] = color.x
-			scales[9] = color.y
-			scales[10] = color.z
-			scales[11] = color.w
-
-			ctx.inst.Funcs.vkCmdPushConstants(cmdB,ctx.textDrawLayout.Get(),VK_SHADER_STAGE_VERTEX_BIT,0,48,scales&)
-			ctx.inst.Funcs.vkCmdDrawIndexed(cmdB,baseIndCount,1,0,0,0)
-		}
-		return void
+		return true
+		
 	}
+
+	vao := u32
+	vbo := u32
+	vboIndex := u32
+	constsObj := u32
+	DrawGL := virtual !(WindowGLContext^ ctx, vec2f offset) -> void
+	{
+		ctx.gl.UseProgram(shaderId)
+		ctx.gl.BindVertexArray(vao)
+		ctx.gl.BindBuffer(GL_ARRAY_BUFFER,vbo)
+		ctx.gl.BindBuffer(GL_ELEMENT_ARRAY_BUFFER,vboIndex)
+		//ctx.gl.BindBuffer(GL_UNIFORM_BUFFER,constsObj)
+		ctx.gl.BindBufferBase(GL_UNIFORM_BUFFER,0,constsObj)
+		ctx.gl.DrawElements(GL_TRIANGLES,width*height*6,GL_UNSIGNED_INT,null)
+		//ctx.gl.Begin(GL_POLYGON);
+	    //ctx.gl.Color3f(1, 0, 0)
+		//ctx.gl.Vertex3f(-1, -1, 0)
+		//ctx.gl.Color3f(0, 1, 0)
+		//ctx.gl.Vertex3f(1, -1, 0)
+	    //ctx.gl.Color3f(0, 0, 1)
+		//ctx.gl.Vertex3f(1, 1, 0)
+	    //ctx.gl.Color3f(1, 1, 1)
+		//ctx.gl.Vertex3f(-1, 1, 0)
+		//ctx.gl.End();
+		//return void
+
+		//for x : width
+		//{
+		//	for y : height
+		//	{
+		//		DrawGLTile(ctx,vec4f(0.5,0.5,0.5,1.0),offset,x,y)
+
+		//		if not Spot(x,y)
+		//			continue
+
+		//		DrawGLTile(ctx,vec4f(1.0,1.0,1.0,1.0),offset,x,y)
+		//	}
+		//}
+		//DrawGLShape(ctx,offset)
+	}
+
+
 
 	mnstrInUse := bool
 	mnstrTime := double
@@ -306,6 +347,14 @@ PlayField := class extend GUIObject
 		result = vec2i(gliderPosition.x + x,gliderPosition.y + y)
 	}
 
-	secretTexture := TVkTexture^ 
-	secretDescr := VkDescriptorSet
+	//secretTexture := TVkTexture^ 
+	//secretDescr := VkDescriptorSet
 }
+
+GlobInfo := class
+{
+	offset := vec2f
+	boxSize := vec2f
+	boxMargin := vec2f
+	counts := vec2i
+};

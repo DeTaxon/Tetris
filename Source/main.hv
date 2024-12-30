@@ -5,27 +5,36 @@ TetrisWindow := class extend Window
 {
 	playField := PlayField
 
-	secretImage := TVkTexture^ 
+	//secretImage := TVkTexture^ 
 	soundEngine := SoundEngine^
 
 	backgroundMusic := Sound^
-	
+
+	physTask := Task^
+	physQuit := bool
+
 	InitWindow := virtual !() -> GUIObject^
 	{
-		soundEngine = new SoundEngine()
-		backgroundMusic = soundEngine.CreateSound(FSGetFile("Tetris.wav"))
-		soundEngine.PlaySoundLooped(backgroundMusic)
-		playField.sEng = soundEngine
-		playField.ToastySound = soundEngine.CreateSound(FSGetFile("Toasty.wav"))
+		ExpectWorkers(4)
 
+		//soundEngine = new SoundEngine()
+		//soundEngine.ReserveSources(5)
+		////soundEngine.CreateTask()
+		//backgroundMusic = soundEngine.CreateSound(FSGetFile("Tetris.wav"))
+		//soundEngine.PlaySoundLooped(backgroundMusic)
+		//playField.sEng = soundEngine
+		//playField.ToastySound = soundEngine.CreateSound(FSGetFile("Toasty.wav"))
+		//
+		//
+	
 		mnstr := #File("Monster1.webp")
 		mImg := new ImageFile(mnstr)
 		mImg2 := mImg.CreateImage("RGBA")
 
-		secretImage = vInstance.CreateTexture()
-		secretImage.CreateTexture(512,512,ArraySpan.{u8}(mImg2.GetPointer(),512*512*4))
+		//secretImage = vInstance.CreateTexture()
+		//secretImage.CreateTexture(512,512,ArraySpan.{u8}(mImg2.GetPointer(),512*512*4))
 
-		playField.secretTexture = secretImage
+		//playField.secretTexture = secretImage
 
 		playField.base = this&
 		playField.SetField(10,25)
@@ -33,27 +42,30 @@ TetrisWindow := class extend Window
 		playField.CurrentShape&->{int^}^ = RandInt(1..8)
 		playField.CurrentShapePos.0 = 4 
 
-		TSpawnTask(() ==> {
-			Phys()
+		SpawnWork(() ==> [c = this&]{
+			c.physTask = TSpawnTask(() ==> {
+				Phys()
+			})
 		})
-		TSpawnTask(() ==> {
-			prevTime := GetSteadyTime()
-			while true
-			{
-				nowTime := GetSteadyTime()
-				playField.Step(nowTime - prevTime)
-				prevTime = nowTime
-				RedrawWindow()
-				TSleep(1 / 60)
-			}
-		})
-		TSpawnTask(() ==> {
-			while true
-			{
-				TSleep(4)
-				playField.StartMonster()
-			}
-		})
+		//TSpawnTask(() ==> {
+		//	prevTime := GetSteadyTime()
+		//	while true
+		//	{
+		//		nowTime := GetSteadyTime()
+		//		playField.Step(nowTime - prevTime)
+		//		prevTime = nowTime
+		//		//RedrawWindow()
+		//		TSleep(1 / 60)
+		//	}
+		//})
+		//TSpawnTask(() ==> {
+		//	TSleep(5)
+		//	while true
+		//	{
+		//		TSleep(RandInt(9..30))
+		//		playField.StartMonster()
+		//	}
+		//})
 
 		return new LayoutHorizontal(![
 			new LayoutSpacer("",0),
@@ -66,6 +78,13 @@ TetrisWindow := class extend Window
 		])
 	}
 
+	InitGL := virtual !(WindowGLContext^ ctx) -> bool
+	{
+		//if not super()
+		//	return false
+		return playField.InitGL(ctx)
+	}
+
 	KeyChangedChar := virtual !(int key, bool pressed) -> void
 	{
 		if playField.KeyChangedChar(key,pressed)
@@ -73,15 +92,20 @@ TetrisWindow := class extend Window
 	}
 	Phys := !() -> void
 	{
-		while true
+		while not physQuit
 		{
 			playField.PhysTick()
-			RedrawWindow()
-			playField.GliderStep()
-			TSleep(0.3)
-			playField.GliderStep()
-			TSleep(0.3)
+			//RedrawWindow()
+			//playField.GliderStep()
+			//TSleep(0.3)
+			//playField.GliderStep()
+			//TSleep(0.3)
+			TSleep(0.6)
 		}
+	}
+	Stop := !() -> void
+	{
+		soundEngine?.Stop()
 	}
 }
 
@@ -90,6 +114,11 @@ main := !(char^[] args) -> int
 	InitTable()
 	win := TetrisWindow(400,470,"Tetris")
 	win.ClearColor = vec4f(1.0,0.5,0.0,1.0)
-	win.Run()
+	win.RunGL()
+	win.Stop()
+
+	win.physQuit = true
+	ACompletion(win.physTask)
+
 	return 0
 }

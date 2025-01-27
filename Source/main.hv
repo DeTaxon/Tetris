@@ -10,6 +10,8 @@ TetrisWindow := class extend Window
 
 	backgroundMusic := Sound^
 
+	fieldTask := Task^
+
 	physTask := Task^
 	physQuit := bool
 
@@ -47,17 +49,17 @@ TetrisWindow := class extend Window
 				Phys()
 			})
 		})
-		//TSpawnTask(() ==> {
-		//	prevTime := GetSteadyTime()
-		//	while true
-		//	{
-		//		nowTime := GetSteadyTime()
-		//		playField.Step(nowTime - prevTime)
-		//		prevTime = nowTime
-		//		//RedrawWindow()
-		//		TSleep(1 / 60)
-		//	}
-		//})
+		physTask = TSpawnTask(() ==> {
+			prevTime := GetSteadyTime()
+			while not physQuit
+			{
+				nowTime := GetSteadyTime()
+				playField.Step(nowTime - prevTime)
+				prevTime = nowTime
+				RedrawWindow()
+				TSleep(1 / 60)
+			}
+		})
 		//TSpawnTask(() ==> {
 		//	TSleep(5)
 		//	while true
@@ -95,7 +97,7 @@ TetrisWindow := class extend Window
 		while not physQuit
 		{
 			playField.PhysTick()
-			//RedrawWindow()
+			RedrawWindow()
 			//playField.GliderStep()
 			//TSleep(0.3)
 			//playField.GliderStep()
@@ -118,7 +120,8 @@ main := !(char^[] args) -> int
 	win.Stop()
 
 	win.physQuit = true
-	ACompletion(win.physTask)
+	win.fieldTask?.AwaitCompletion()
+	win.physTask.AwaitCompletion()
 
 	return 0
 }

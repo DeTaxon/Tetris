@@ -79,9 +79,6 @@ PlayField := class extend GUIObject
 	}
 
 	shaderId := u32
-	locConsts := s32
-	locSet := s32
-	modelId := int
 
 	InitGL := virtual !(WindowGLContext^ ctx) -> bool
 	{
@@ -130,56 +127,22 @@ PlayField := class extend GUIObject
 		status := int
 		ctx.gl.GetProgramiv(shaderId, GL_LINK_STATUS, status&)
 
-		locConsts = 0 //ctx.gl.GetUniformLocation(shaderId,"Consts")
-		locSet = 0 //ctx.gl.GetAttribLocation(shaderId,"isSet")
-
-
-		//ctx.gl.CreateVertexArrays(1,vao&)
-		//ctx.gl.CreateBuffers(1,vbo&)
-
-
-		//ctx.gl.EnableVertexArrayAttrib(vao,locSet)
-		//ctx.gl.VertexArrayAttribFormat(vao,locSet,1,GL_UNSIGNED_BYTE,GL_TRUE,0)
-		
-
 		ctx.gl.GenVertexArrays(1,vao&)
 		ctx.gl.GenBuffers(1,vbo&)
 
-		ctx.gl.BindBuffer(GL_ARRAY_BUFFER,vbo)
-		ctx.gl.BufferData(GL_ARRAY_BUFFER,width*height,FieldState[0]&,GL_DYNAMIC_DRAW)
-
 		ctx.gl.BindVertexArray(vao)
-		ctx.gl.EnableVertexAttribArray(locSet)
-		ctx.gl.VertexAttribPointer(locSet,1,GL_UNSIGNED_BYTE,GL_FALSE,1,null)
-		ctx.gl.BindVertexArray(0)
+		ctx.gl.BindBuffer(GL_ARRAY_BUFFER,vbo)
+
+		ctx.gl.EnableVertexAttribArray(0)
+		ctx.gl.VertexAttribPointer(0,2,GL_FLOAT,GL_FALSE,6*4,null)
+
+		dat := u64
+		dat = 8
+		ctx.gl.EnableVertexAttribArray(1)
+		ctx.gl.VertexAttribPointer(1,4,GL_FLOAT,GL_FALSE,6*4,dat&->{void^^}^)
 
 		ctx.gl.GenBuffers(1,vboIndex&)
 		ctx.gl.BindBuffer(GL_ELEMENT_ARRAY_BUFFER,vboIndex)
-
-		inds := Vector.{int}
-		inds.Resize(1024*6)
-		ptr := inds.GetPointer()
-
-		for it : 1024
-		{
-			for i : 6
-			{
-				ptr[it*6 + i] = it
-			}
-		}
-		ctx.gl.BufferData(GL_ELEMENT_ARRAY_BUFFER,4*inds.Size(),ptr,GL_STATIC_DRAW)
-
-
-		cnsts := GlobInfo
-		cnsts.offset = vec2f(0,0)
-		cnsts.boxSize = vec2f(boxSize,boxSize)
-		cnsts.boxMargin = vec2f(margin,margin)
-		cnsts.counts = vec2i(width,height)
-
-		ctx.gl.GenBuffers(1,constsObj&)
-		ctx.gl.BindBuffer(GL_UNIFORM_BUFFER,constsObj)
-		ctx.gl.BufferData(GL_UNIFORM_BUFFER,GlobInfo->TypeSize,cnsts&,GL_STATIC_DRAW)
-
 		return true
 		
 	}
@@ -187,27 +150,92 @@ PlayField := class extend GUIObject
 	vao := u32
 	vbo := u32
 	vboIndex := u32
-	constsObj := u32
 	DrawGL := virtual !(WindowGLContext^ ctx, vec2f offset) -> void
 	{
+		vecs := Vector.{float}
+		vecs.Resize(width*height*6*4)
+		vecPtr := vecs.GetPointer()
+
+
+		shapeIndx := bool[1024]
+		PerBoxCheck(CurrentShapePos,CurrentShapeRotation,(x,y) ==> {
+			shapeIndx[y*width + x] = true
+		})
+
+		for x : width
+		{
+			for y : height
+			{
+				vecInd := (y*width + x)*6*4
+				spt := IsSpot(x,y) or shapeIndx[y*width + x]
+
+
+				for z : 4 , offsetX : ![false,true,false,true], offsetY : ![false,false,true,true] 
+				{
+					vecThisPtr := vecPtr[vecInd + z*6]&
+
+					vecThisPtr[0] = x*(boxSize + margin)
+					if offsetX
+						vecThisPtr[0] += boxSize
+					vecThisPtr[1] = y*(boxSize + margin)
+					if offsetY
+						vecThisPtr[1] += boxSize
+
+					vecThisPtr[0] += offset.x
+					vecThisPtr[1] += offset.y
+
+					vecThisPtr[0] = vecThisPtr[0] / 400.0
+					vecThisPtr[1] = vecThisPtr[1] / 470.0
+
+					vecThisPtr[0] = vecThisPtr[0]*2 - 1.0
+					vecThisPtr[1] = 1.0 - vecThisPtr[1]*2
+					
+					colorPtr := vecThisPtr[2]&
+
+					if spt {
+						colorPtr[0] = 1.0 
+						colorPtr[1] = 1.0 
+						colorPtr[2] = 1.0 
+						colorPtr[3] = 1.0 
+					}else{
+						colorPtr[0] = 0.0 
+						colorPtr[1] = 0.0 
+						colorPtr[2] = 0.0 
+						colorPtr[3] = 1.0
+					}
+
+				}
+			}
+		}
+
+		inds := Vector.{int}
+		inds.Resize(width*height*6)
+		indsPtr := inds.GetPointer()
+
+		for x : width
+		{
+			for y : height
+			{
+				off := (y*width + x)*4
+				thisPtr := indsPtr[(y*width + x)*6]&
+				thisPtr[0] = off + 0
+				thisPtr[1] = off + 1
+				thisPtr[2] = off + 2
+				thisPtr[3] = off + 1
+				thisPtr[4] = off + 3
+				thisPtr[5] = off + 2
+			}
+		}
+
+		ctx.gl.BindVertexArray(vao)
+
 		ctx.gl.UseProgram(shaderId)
 		ctx.gl.BindVertexArray(vao)
 		ctx.gl.BindBuffer(GL_ARRAY_BUFFER,vbo)
+		ctx.gl.BufferData(GL_ARRAY_BUFFER,vecs.Size()*4,vecs.GetPointer(),GL_DYNAMIC_DRAW)
 		ctx.gl.BindBuffer(GL_ELEMENT_ARRAY_BUFFER,vboIndex)
-		//ctx.gl.BindBuffer(GL_UNIFORM_BUFFER,constsObj)
-		ctx.gl.BindBufferBase(GL_UNIFORM_BUFFER,0,constsObj)
+		ctx.gl.BufferData(GL_ELEMENT_ARRAY_BUFFER,4*inds.Size(),inds.GetPointer(),GL_DYNAMIC_DRAW)
 		ctx.gl.DrawElements(GL_TRIANGLES,width*height*6,GL_UNSIGNED_INT,null)
-		//ctx.gl.Begin(GL_POLYGON);
-	    //ctx.gl.Color3f(1, 0, 0)
-		//ctx.gl.Vertex3f(-1, -1, 0)
-		//ctx.gl.Color3f(0, 1, 0)
-		//ctx.gl.Vertex3f(1, -1, 0)
-	    //ctx.gl.Color3f(0, 0, 1)
-		//ctx.gl.Vertex3f(1, 1, 0)
-	    //ctx.gl.Color3f(1, 1, 1)
-		//ctx.gl.Vertex3f(-1, 1, 0)
-		//ctx.gl.End();
-		//return void
 
 		//for x : width
 		//{

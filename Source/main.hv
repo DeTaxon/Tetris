@@ -26,17 +26,6 @@ TetrisWindow := class extend Window
 		//soundEngine.PlaySoundLooped(backgroundMusic)
 		//playField.sEng = soundEngine
 		//playField.ToastySound = soundEngine.CreateSound(FSGetFile("Toasty.wav"))
-		//
-		//
-	
-		mnstr := #File("Monster1.webp")
-		mImg := new ImageFile(mnstr)
-		mImg2 := mImg.CreateImage("RGBA")
-
-		//secretImage = vInstance.CreateTexture()
-		//secretImage.CreateTexture(512,512,ArraySpan.{u8}(mImg2.GetPointer(),512*512*4))
-
-		//playField.secretTexture = secretImage
 
 		playField.base = this&
 		playField.SetField(10,25)
@@ -60,14 +49,16 @@ TetrisWindow := class extend Window
 				TSleep(1 / 60)
 			}
 		})
-		//TSpawnTask(() ==> {
-		//	TSleep(5)
-		//	while true
-		//	{
-		//		TSleep(RandInt(9..30))
-		//		playField.StartMonster()
-		//	}
-		//})
+		TSpawnTask(() ==> {
+			//TSleep(3)
+			while true
+			{
+				//TSleep(RandInt(9..30))
+				//playField.StartMonster()
+				TSleep(0.5)
+				playField.SpawnGlider()
+			}
+		})
 
 		return new LayoutHorizontal(![
 			new LayoutSpacer("",0),
@@ -98,11 +89,10 @@ TetrisWindow := class extend Window
 		{
 			playField.PhysTick()
 			RedrawWindow()
-			//playField.GliderStep()
-			//TSleep(0.3)
-			//playField.GliderStep()
-			//TSleep(0.3)
-			TSleep(0.6)
+			playField.GliderStep()
+			TSleep(0.3)
+			playField.GliderStep()
+			TSleep(0.3)
 		}
 	}
 	Stop := !() -> void

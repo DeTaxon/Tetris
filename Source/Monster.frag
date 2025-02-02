@@ -1,12 +1,13 @@
 
 #version 450 core
 
-in vec4 FragColor;
-out vec2 outUV;
+in vec2 outUV;
+
+layout (binding = 0) uniform sampler2D text;
 
 out vec4 ResultColor;
 
 void main()
 {
-	ResultColor = FragColor;
+	ResultColor = texture(text,outUV);
 }

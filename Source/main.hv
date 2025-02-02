@@ -18,15 +18,15 @@ TetrisWindow := class extend Window
 
 	InitWindow := virtual !() -> GUIObject^
 	{
-		ExpectWorkers(4)
+		//ExpectWorkers(4)
 
-		//soundEngine = new SoundEngine()
-		//soundEngine.ReserveSources(5)
-		////soundEngine.CreateTask()
-		//backgroundMusic = soundEngine.CreateSound(FSGetFile("Tetris.wav"))
-		//soundEngine.PlaySoundLooped(backgroundMusic)
-		//playField.sEng = soundEngine
-		//playField.ToastySound = soundEngine.CreateSound(FSGetFile("Toasty.wav"))
+		soundEngine = new SoundEngine()
+		soundEngine.ReserveSources(5)
+		soundEngine.CreateTask()
+		backgroundMusic = soundEngine.CreateSound(FSGetFile("Tetris.wav"))
+		soundEngine.PlaySoundLooped(backgroundMusic)
+		playField.sEng = soundEngine
+		playField.ToastySound = soundEngine.CreateSound(FSGetFile("Toasty.wav"))
 
 		playField.base = this&
 		playField.SetField(10,25)
@@ -34,11 +34,11 @@ TetrisWindow := class extend Window
 		playField.CurrentShape&->{int^}^ = RandInt(1..8)
 		playField.CurrentShapePos.0 = 4 
 
-		SpawnWork(() ==> [c = this&]{
-			c.physTask = TSpawnTask(() ==> {
+		//SpawnWork(() ==> [c = this&]{
+			physTask = TSpawnTask(() ==> {
 				Phys()
 			})
-		})
+		//})
 		physTask = TSpawnTask(() ==> {
 			prevTime := GetSteadyTime()
 			while not physQuit
@@ -51,11 +51,10 @@ TetrisWindow := class extend Window
 			}
 		})
 		mnstrTask = TSpawnTask(() ==> {
-			//TSleep(3)
+			TSleep(3)
 			while not physQuit
 			{
-				//TSleep(RandInt(9..30))
-				TSleep(1)
+				TSleep(RandInt(9..30))
 				playField.StartMonster()
 				//TSleep(0.5)
 				//playField.SpawnGlider()

@@ -244,6 +244,8 @@ AppendClass PlayField
 	ApplyFigure := !() -> void
 	{
 		PerBoxCheck(CurrentShapePos,CurrentShapeRotation, (x,y) ==> {
+			if x < 0 or y < 0
+				return void
 			Spot(x,y) = true
 		})
 		CurrentShapePos.1 = 0
